@@ -1,5 +1,6 @@
 pragma solidity ^0.4.0;
 
+import {EthermillionBoard} from './Board.sol';
 
 contract Ethermillion {
     /**
@@ -59,10 +60,10 @@ contract Ethermillion {
     uint256 public prizePerWinner = 0;
 
     /**
-     * The prize that is given to the manager. This is updated when the
+     * The prize that is given to the token holders. This is updated when the
      * lottery is finished and is 0 otherwise
      */
-    uint256 public prizeForManager = 0;
+    uint256 public prizeForTokenHolders = 0;
 
     /**
      * The prize for all the people who gave a seed for RNG. This will be
@@ -137,6 +138,11 @@ contract Ethermillion {
      */
     uint numberOfReveals = 0;
 
+    /**
+     * The board of token holders to send the profits to
+     */
+    EthermillionBoard public board;
+
     modifier onlyManager() {
         require(msg.sender == manager);
         _;
@@ -160,11 +166,17 @@ contract Ethermillion {
     /**
      * When the lottery is finished, we send this event with the winning number,
      * the prize per winner (per winning ticket actually, since a player
-     * can have multiple tickets) and the prize per seeder.
+     * can have multiple tickets), the number of winners and the prize per
+     * seeder.
      */
     event LotteryFinished(uint winningNumber,
-    uint prizePerWinner,
+    uint prize,
+    uint nWinners,
     uint prizePerSeeder);
+
+    function EtherMillion(EthermillionBoard _board) {
+        board = _board;
+    }
 
     /**
      * Buy a ticket for a specified number. This number has to be between 1 and
@@ -188,13 +200,14 @@ contract Ethermillion {
 
         // The prize increases by 7 finney.
         prize += 8 finney;
-        // The prize for the manager increases by 1 finney
-        prizeForManager += 1 finney;
+        // The prize for the token holders increases by 1 finney
+        prizeForTokenHolders += 1 finney;
         // The prize for the seeders increases by 1 finney
         prizeForSeeders += 1 finney;
 
         return prize;
     }
+
 
     /**
      * Called by a seeder with a hash constructed like this:
@@ -229,18 +242,20 @@ contract Ethermillion {
         // Use the number and the salt to compute the hash
         var computedHash = sha256(bytes(salt), number, bytes(salt));
 
-        if (!seeder.revealed && seeder.hash == computedHash) {
-            seeder.revealed = true;
+        // To continue, the computed hash must be the same as the sent hash
+        // and the seeder must have not revealed his number yet
+        require(!seeder.revealed && seeder.hash == computedHash);
 
-            // Update the winning number by xoring it with the seeder's random
-            // number
-            winningNumber = winningNumber ^ number;
+        seeder.revealed = true;
 
-            numberOfReveals++;
+        // Update the winning number by xoring it with the seeder's random
+        // number
+        winningNumber = winningNumber ^ number;
 
-            // Refund the seeder of his security deposit
-            msg.sender.transfer(SEEDER_SECURITY_DEPOSIT);
-        }
+        numberOfReveals++;
+
+        // Refund the seeder of his security deposit
+        msg.sender.transfer(SEEDER_SECURITY_DEPOSIT);
     }
 
     /**
@@ -256,17 +271,17 @@ contract Ethermillion {
         // Make th ewinning number be in between 1 and 10 000 included
         winningNumber = winningNumber % 10000 + 1;
 
-        // Compute prize per winning ticket
-        prizePerWinner = prize / tickets[winningNumber].length;
+        // The number of winners
+        var nWinners = tickets[winningNumber].length;
 
         // Compute prize per seeder
         prizePerSeeder = prizeForSeeders / numberOfReveals;
 
-        // Notify players that the lottery is finished
-        LotteryFinished(winningNumber, prizePerWinner, prizePerSeeder);
+        // Send the token holder's profits to the board
+        board.Deposit.value(prizeForTokenHolders)();
 
-        // The manager gets its profits
-        manager.transfer(prizeForManager);
+        // Notify players that the lottery is finished
+        LotteryFinished(winningNumber, prize, nWinners, prizePerSeeder);
     }
 
     /**

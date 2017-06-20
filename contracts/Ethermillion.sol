@@ -302,6 +302,7 @@ contract Ethermillion {
         var seeder = seeders[msg.sender];
 
         if (seeder.revealed && !seeder.withdrew) {
+            seeder.withdrew = true;
             msg.sender.transfer(prizePerSeeder);
         }
     }

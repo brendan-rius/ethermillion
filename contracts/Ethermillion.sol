@@ -129,7 +129,7 @@ contract Ethermillion {
     /**
      * All the seeders for RNGs
      */
-    mapping (address => Seeder) seeders;
+    mapping(address => Seeder) seeders;
 
     /**
      * Number of seeders who have revealed their numbers. This is used to
@@ -208,9 +208,9 @@ contract Ethermillion {
     atExactPrice(SEEDER_SECURITY_DEPOSIT)
     {
         seeders[msg.sender] = Seeder({
-        revealed : false,
-        hash : hash,
-        withdrew : false
+        revealed: false,
+        hash: hash,
+        withdrew: false
         });
     }
 
@@ -279,18 +279,18 @@ contract Ethermillion {
         var winningTickets = tickets[winningNumber];
 
         // The total profits that have been transferred
-        uint256 transferred = 0;
+        uint256 toTransfer = 0;
 
         for (uint256 i = 0; i < winningTickets.length; i++) {
             var ticket = winningTickets[i];
             if (ticket.addr == msg.sender && !ticket.withdrew) {
                 ticket.withdrew = true;
-                msg.sender.transfer(prizePerWinner);
-                transferred += prizePerWinner;
+                toTransfer += prizePerWinner;
             }
         }
 
-        return transferred;
+        msg.sender.transfer(toTransfer);
+        return toTransfer;
     }
 
     /**
